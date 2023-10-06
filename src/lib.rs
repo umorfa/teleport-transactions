@@ -47,6 +47,12 @@ use offerbook_sync::{get_advertised_maker_addresses, sync_offerbook_with_address
 pub mod fidelity_bonds;
 use fidelity_bonds::{get_locktime_from_index, YearAndMonth};
 
+pub mod settings;
+// use settings::Settings;
+
+pub mod utils;
+use utils::app_data_dir;
+
 pub mod directory_servers;
 pub mod error;
 pub mod funding_tx;
