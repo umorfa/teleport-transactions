@@ -9,6 +9,7 @@ use teleport;
 use teleport::direct_send::{CoinToSpend, Destination, SendAmount};
 use teleport::fidelity_bonds::YearAndMonth;
 use teleport::maker_protocol::MakerBehavior;
+use teleport::settings::Settings;
 use teleport::wallet_sync::{DisplayAddressType, WalletSyncAddressAmount};
 use teleport::watchtower_protocol::{ContractTransaction, ContractsInfo};
 
@@ -129,6 +130,7 @@ enum Subcommand {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     teleport::setup_logger();
+    Settings::init_settings();
     let args = ArgsWithWalletFile::from_args();
 
     match args.subcommand {

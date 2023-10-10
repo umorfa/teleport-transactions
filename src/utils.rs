@@ -22,4 +22,3 @@ pub fn app_data_dir(appname: &str) -> PathBuf {
     }
     home_dir().unwrap().join(format!(".{}", appname))
 }
-

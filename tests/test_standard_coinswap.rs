@@ -5,6 +5,7 @@ use bitcoincore_rpc::{Client, RpcApi};
 
 use teleport::fidelity_bonds::YearAndMonth;
 use teleport::maker_protocol::MakerBehavior;
+use teleport::settings::Settings;
 use teleport::wallet_sync::{Wallet, WalletSyncAddressAmount};
 
 use serde_json::Value;
@@ -58,6 +59,7 @@ pub fn generate_1_block(rpc: &Client) {
 #[tokio::test]
 async fn test_standard_coinswap() {
     teleport::setup_logger();
+    Settings::init_settings();
 
     let (rpc, network) = teleport::get_bitcoin_rpc().unwrap();
     assert_eq!(network, Network::Regtest);

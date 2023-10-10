@@ -1,15 +1,7 @@
-const RPC_CREDENTIALS: Option<(&str, &str)> = Some(("regtestrpcuser", "regtestrpcpass"));
-//None; // use Bitcoin Core cookie-based authentication
-
-const RPC_WALLET: &str = "teleport";
-const RPC_HOSTPORT: &str = "localhost:18443";
-//default ports: mainnet=8332, testnet=18332, regtest=18443, signet=38332
-
 extern crate bitcoin;
 extern crate bitcoin_wallet;
 extern crate bitcoincore_rpc;
 
-use dirs::home_dir;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io;
@@ -48,7 +40,7 @@ pub mod fidelity_bonds;
 use fidelity_bonds::{get_locktime_from_index, YearAndMonth};
 
 pub mod settings;
-// use settings::Settings;
+use settings::Settings;
 
 pub mod utils;
 use utils::app_data_dir;
@@ -73,19 +65,15 @@ fn str_to_bitcoin_network(net_str: &str) -> Network {
 }
 
 pub fn get_bitcoin_rpc() -> Result<(Client, Network), Error> {
-    let auth = match RPC_CREDENTIALS {
-        Some((user, pass)) => Auth::UserPass(user.to_string(), pass.to_string()),
-        None => {
-            //TODO this currently only works for Linux and regtest,
-            //     also support other OSes (Windows, MacOS...) and networks
-            let data_dir = home_dir().unwrap().join(".bitcoin");
-            Auth::CookieFile(data_dir.join("regtest").join(".cookie"))
-        }
+    let blockchain_settings = &Settings::global().blockchain;
+    let auth = match (
+        &blockchain_settings.rpc_user,
+        &blockchain_settings.rpc_password,
+    ) {
+        (Some(user), Some(pass)) => Auth::UserPass(user.to_string(), pass.to_string()),
+        _ => Auth::CookieFile(blockchain_settings.rpc_cookie_path()),
     };
-    let rpc = Client::new(
-        format!("http://{}/wallet/{}", RPC_HOSTPORT, RPC_WALLET),
-        auth,
-    )?;
+    let rpc = Client::new(blockchain_settings.rpc_url(), auth)?;
     let network = str_to_bitcoin_network(rpc.get_blockchain_info()?.chain.as_str());
     Ok((rpc, network))
 }

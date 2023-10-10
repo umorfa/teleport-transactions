@@ -1,5 +1,6 @@
 use config::{Config, Environment, File, FileFormat};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use crate::app_data_dir;
@@ -23,21 +24,42 @@ pub struct BlockchainSettings {
     pub rpc_wallet_file: String,
 }
 
+impl BlockchainSettings {
+    pub fn rpc_cookie_path(&self) -> PathBuf {
+        let bitcoin_dir = app_data_dir("bitcoin");
+        let network_dir = match self.network.as_str() {
+            "main" => "",
+            "testnet" => "testnet3",
+            _ => self.network.as_str(),
+        };
+        let cookie_file = match &self.rpc_cookie_file {
+            Some(f) => f.as_str(),
+            None => ".cookie",
+        };
+        bitcoin_dir.join(network_dir).join(cookie_file)
+    }
+
+    pub fn rpc_url(&self) -> String {
+        format!(
+            "http://{}:{}/wallet/{}",
+            self.rpc_host, self.rpc_port, &self.rpc_wallet_file
+        )
+    }
+}
+
 impl Settings {
     pub fn global() -> &'static Settings {
         SETTINGS.get().as_ref().expect("Settings not initialized")
     }
-    pub fn init_settings() -> &'static Settings {
 
+    pub fn init_settings() -> &'static Settings {
         let datadir = app_data_dir("teleport");
         let config_location = datadir.join("teleport.conf");
 
         let s = Config::builder()
-            .add_source(File::new(
-                    config_location.to_str().unwrap(),
-                    FileFormat::Toml,
-                    ))
-            .add_source(Environment::with_prefix("TELEPORT"))
+            .add_source(
+                File::new(config_location.to_str().unwrap(), FileFormat::Toml).required(false),
+            )
             .build()
             .unwrap();
 
