@@ -1,4 +1,4 @@
-use config::{Config, Environment, File, FileFormat};
+use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -23,7 +23,6 @@ pub struct BlockchainSettings {
     pub rpc_cookie_file: Option<String>,
     pub rpc_wallet_file: String,
 }
-
 impl BlockchainSettings {
     pub fn rpc_cookie_path(&self) -> PathBuf {
         let bitcoin_dir = app_data_dir("bitcoin");
@@ -57,6 +56,7 @@ impl Settings {
         let config_location = datadir.join("teleport.conf");
 
         let s = Config::builder()
+            .add_source(Config::try_from(&Settings::default()).unwrap())
             .add_source(
                 File::new(config_location.to_str().unwrap(), FileFormat::Toml).required(false),
             )
@@ -66,5 +66,21 @@ impl Settings {
         let settings = s.try_deserialize().unwrap();
         SETTINGS.set(settings).unwrap();
         Settings::global()
+    }
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            blockchain: BlockchainSettings {
+                network: "regtest".to_string(),
+                rpc_host: "localhost".to_string(),
+                rpc_port: 18443,
+                rpc_user: None,
+                rpc_password: None,
+                rpc_cookie_file: None,
+                rpc_wallet_file: "teleport".to_string(),
+            },
+        }
     }
 }
