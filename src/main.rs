@@ -29,6 +29,10 @@ struct ArgsWithWalletFile {
     #[structopt(default_value = "1000", short = "f", long)]
     fee_rate: u64,
 
+    /// Data directory for teleport files
+    #[structopt(parse(from_os_str), long)]
+    datadir: PathBuf,
+
     /// Subcommand
     #[structopt(flatten)]
     subcommand: Subcommand,
@@ -129,9 +133,9 @@ enum Subcommand {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    teleport::setup_logger();
-    Settings::init_settings();
     let args = ArgsWithWalletFile::from_args();
+    Settings::init_settings(&args.datadir);
+    teleport::setup_teleport();
 
     match args.subcommand {
         Subcommand::GenerateWallet => {

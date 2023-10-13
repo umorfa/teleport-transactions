@@ -4,6 +4,7 @@ extern crate bitcoincore_rpc;
 
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::fs;
 use std::io;
 use std::iter::repeat;
 use std::path::PathBuf;
@@ -43,7 +44,7 @@ pub mod settings;
 use settings::Settings;
 
 pub mod utils;
-use utils::app_data_dir;
+use utils::teleport_data_dir;
 
 pub mod directory_servers;
 pub mod error;
@@ -79,14 +80,24 @@ pub fn get_bitcoin_rpc() -> Result<(Client, Network), Error> {
 }
 
 /// Setup function that will only run once, even if called multiple times.
-pub fn setup_logger() {
+pub fn setup_teleport() {
     INIT.call_once(|| {
+        // Setup logger
         env_logger::Builder::from_env(
             env_logger::Env::default()
                 .default_filter_or("teleport=info,main=info,wallet=info")
                 .default_write_style_or("always"),
         )
         .init();
+
+        // Setup app data directory
+        let datadir = teleport_data_dir();
+        if !datadir.exists() {
+            fs::create_dir(&datadir).expect("Error making app data dir");
+        }
+        if !datadir.join("wallets").exists() {
+            fs::create_dir(&datadir.join("wallets")).expect("Error making wallet dir");
+        }
     });
 }
 

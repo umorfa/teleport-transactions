@@ -30,6 +30,7 @@ use crate::contracts::{
     read_locktime_from_contract, read_timelock_pubkey_from_contract,
 };
 use crate::error::Error;
+use crate::utils::teleport_data_dir;
 use crate::wallet_sync::import_redeemscript;
 
 //TODO these two structs below are used for two different purposes
@@ -355,7 +356,7 @@ async fn handle_message(
 }
 
 fn read_from_data_file<P: AsRef<Path>>(data_file_path: P) -> Result<WatchtowerDataFile, Error> {
-    let mut data_file = File::open(data_file_path)?;
+    let mut data_file = File::open(teleport_data_dir().join(data_file_path))?;
     let mut data_file_str = String::new();
     data_file.read_to_string(&mut data_file_str)?;
     Ok(serde_json::from_str::<WatchtowerDataFile>(&data_file_str)
@@ -366,7 +367,7 @@ fn write_to_data_file<P: AsRef<Path>>(
     data_file_path: P,
     data: WatchtowerDataFile,
 ) -> Result<(), Error> {
-    let data_file = File::create(data_file_path)?;
+    let data_file = File::create(teleport_data_dir().join(data_file_path))?;
     serde_json::to_writer(data_file, &data).map_err(|e| io::Error::from(e))?;
     Ok(())
 }

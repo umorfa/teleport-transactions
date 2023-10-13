@@ -7,7 +7,7 @@ use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -56,6 +56,7 @@ use crate::contracts::SwapCoin;
 use crate::error::Error;
 use crate::fidelity_bonds;
 use crate::messages::Preimage;
+use crate::utils::teleport_data_dir;
 
 //these subroutines are coded so that as much as possible they keep all their
 //data in the bitcoin core wallet
@@ -618,6 +619,10 @@ impl Wallet {
         }
     }
 
+    fn get_wallet_path<P: AsRef<Path>>(wallet_file_name: P) -> PathBuf {
+        teleport_data_dir().join("wallets").join(wallet_file_name)
+    }
+
     pub fn save_new_wallet_file<P: AsRef<Path>>(
         wallet_file_name: P,
         seedphrase: String,
@@ -635,13 +640,13 @@ impl Wallet {
         let wallet_file = OpenOptions::new()
             .write(true)
             .create_new(true)
-            .open(wallet_file_name)?;
+            .open(Wallet::get_wallet_path(wallet_file_name))?;
         serde_json::to_writer(wallet_file, &wallet_file_data).map_err(|e| io::Error::from(e))?;
         Ok(())
     }
 
     fn load_wallet_file_data<P: AsRef<Path>>(wallet_file_name: P) -> Result<WalletFileData, Error> {
-        let mut wallet_file = File::open(wallet_file_name)?;
+        let mut wallet_file = File::open(Wallet::get_wallet_path(wallet_file_name))?;
         let mut wallet_file_str = String::new();
         wallet_file.read_to_string(&mut wallet_file_str)?;
         Ok(serde_json::from_str::<WalletFileData>(&wallet_file_str)
@@ -928,6 +933,8 @@ impl Wallet {
             )
             .collect::<Vec<ImportMultiRequest>>();
 
+        // TODO - Legacy wallets will be removed from future versions of bitcoin core
+        // Add support for descriptor wallets
         let result = rpc.import_multi(
             &import_requests,
             Some(&ImportMultiOptions {

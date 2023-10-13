@@ -3,15 +3,18 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-use crate::app_data_dir;
+use crate::utils::bitcoin_data_dir;
 
 static SETTINGS: OnceLock<Settings> = OnceLock::new();
 
+/// Global settings
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Settings {
     pub blockchain: BlockchainSettings,
+    pub unstable: UnstableSettings,
 }
 
+/// Settings relating to the bitcoin node
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BlockchainSettings {
     pub network: String,
@@ -23,21 +26,19 @@ pub struct BlockchainSettings {
     pub rpc_cookie_file: Option<String>,
     pub rpc_wallet_file: String,
 }
+
 impl BlockchainSettings {
+    /// Return the file path to the bitcoin RPC cookie file.
+    /// Note that this file only exists if bitcoind is actively running
     pub fn rpc_cookie_path(&self) -> PathBuf {
-        let bitcoin_dir = app_data_dir("bitcoin");
-        let network_dir = match self.network.as_str() {
-            "main" => "",
-            "testnet" => "testnet3",
-            _ => self.network.as_str(),
-        };
         let cookie_file = match &self.rpc_cookie_file {
             Some(f) => f.as_str(),
             None => ".cookie",
         };
-        bitcoin_dir.join(network_dir).join(cookie_file)
+        bitcoin_data_dir(&self.network).join(cookie_file)
     }
 
+    /// Return the RPC URL
     pub fn rpc_url(&self) -> String {
         format!(
             "http://{}:{}/wallet/{}",
@@ -46,13 +47,17 @@ impl BlockchainSettings {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct UnstableSettings {
+    pub datadir: Option<PathBuf>,
+}
+
 impl Settings {
     pub fn global() -> &'static Settings {
         SETTINGS.get().as_ref().expect("Settings not initialized")
     }
 
-    pub fn init_settings() -> &'static Settings {
-        let datadir = app_data_dir("teleport");
+    pub fn init_settings(datadir: &PathBuf) -> &'static Settings {
         let config_location = datadir.join("teleport.conf");
 
         let s = Config::builder()
@@ -60,6 +65,8 @@ impl Settings {
             .add_source(
                 File::new(config_location.to_str().unwrap(), FileFormat::Toml).required(false),
             )
+            .set_override("unstable.datadir", datadir.to_str())
+            .unwrap()
             .build()
             .unwrap();
 
@@ -81,6 +88,7 @@ impl Default for Settings {
                 rpc_cookie_file: None,
                 rpc_wallet_file: "teleport".to_string(),
             },
+            unstable: UnstableSettings { datadir: None },
         }
     }
 }
