@@ -623,6 +623,10 @@ impl Wallet {
         teleport_data_dir().join("wallets").join(wallet_file_name)
     }
 
+    fn wallet_path(&self) -> PathBuf {
+        Wallet::get_wallet_path(&self.wallet_file_name)
+    }
+
     pub fn save_new_wallet_file<P: AsRef<Path>>(
         wallet_file_name: P,
         seedphrase: String,
@@ -641,6 +645,7 @@ impl Wallet {
             .write(true)
             .create_new(true)
             .open(Wallet::get_wallet_path(wallet_file_name))?;
+        dbg!(&wallet_file);
         serde_json::to_writer(wallet_file, &wallet_file_data).map_err(|e| io::Error::from(e))?;
         Ok(())
     }
@@ -708,14 +713,14 @@ impl Wallet {
     }
 
     pub fn delete_wallet_file(&self) -> Result<(), Error> {
-        Ok(fs::remove_file(&self.wallet_file_name)?)
+        Ok(fs::remove_file(&self.wallet_path())?)
     }
 
     pub fn update_external_index(&mut self, new_external_index: u32) -> Result<(), Error> {
         self.external_index = new_external_index;
         let mut wallet_file_data = Wallet::load_wallet_file_data(&self.wallet_file_name)?;
         wallet_file_data.external_index = new_external_index;
-        let wallet_file = File::create(&self.wallet_file_name[..])?;
+        let wallet_file = File::create(&self.wallet_path())?;
         serde_json::to_writer(wallet_file, &wallet_file_data).map_err(|e| io::Error::from(e))?;
         Ok(())
     }
@@ -736,7 +741,7 @@ impl Wallet {
             .values()
             .cloned()
             .collect::<Vec<OutgoingSwapCoin>>();
-        let wallet_file = File::create(&self.wallet_file_name[..])?;
+        let wallet_file = File::create(&self.wallet_path())?;
         serde_json::to_writer(wallet_file, &wallet_file_data).map_err(|e| io::Error::from(e))?;
         Ok(())
     }
@@ -817,7 +822,7 @@ impl Wallet {
         wallet_file_data
             .prevout_to_contract_map
             .insert(prevout, contract);
-        let wallet_file = File::create(&self.wallet_file_name[..])?;
+        let wallet_file = File::create(self.wallet_path())?;
         serde_json::to_writer(wallet_file, &wallet_file_data).map_err(|e| io::Error::from(e))?;
         Ok(())
     }
