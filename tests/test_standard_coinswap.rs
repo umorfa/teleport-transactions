@@ -5,7 +5,10 @@ use bitcoincore_rpc::{Client, RpcApi};
 
 use teleport::fidelity_bonds::YearAndMonth;
 use teleport::maker_protocol::MakerBehavior;
+use teleport::settings::Settings;
 use teleport::wallet_sync::{Wallet, WalletSyncAddressAmount};
+
+use tempfile::tempdir;
 
 use serde_json::Value;
 
@@ -13,12 +16,10 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use std::{thread, time};
 
-use std::str::FromStr;
-
-static WATCHTOWER_DATA: &str = "tests/watchtower.dat";
-static TAKER: &str = "tests/taker-wallet";
-static MAKER1: &str = "tests/maker-wallet-1";
-static MAKER2: &str = "tests/maker-wallet-2";
+static WATCHTOWER_DATA: &str = "watchtower.dat";
+static TAKER: &str = "taker-wallet";
+static MAKER1: &str = "maker-wallet-1";
+static MAKER2: &str = "maker-wallet-2";
 
 // Helper function to create new wallet
 fn create_wallet_and_import(rpc: &Client, filename: PathBuf) -> Wallet {
@@ -57,8 +58,13 @@ pub fn generate_1_block(rpc: &Client) {
 // wallet name `teleport` loaded and have enough balance to execute transactions.
 #[tokio::test]
 async fn test_standard_coinswap() {
-    teleport::setup_logger();
+    let test_dir = tempdir().expect("Error making temporary directory");
+    let test_path = test_dir.path().to_owned();
+    Settings::init_settings(&test_path);
+    teleport::setup_teleport();
 
+    // TODO: This only works if the RPC cookie file exists in its default location
+    // Need to figure out a good solution for setting test credentials and other test config
     let (rpc, network) = teleport::get_bitcoin_rpc().unwrap();
     assert_eq!(network, Network::Regtest);
 
@@ -76,9 +82,10 @@ async fn test_standard_coinswap() {
     let mut maker2_wallet = create_wallet_and_import(&rpc, MAKER2.into());
 
     // Check files are created
-    assert!(std::path::Path::new(TAKER).exists());
-    assert!(std::path::Path::new(MAKER1).exists());
-    assert!(std::path::Path::new(MAKER2).exists());
+    let wallet_path = test_path.join("wallets");
+    assert!(wallet_path.join(TAKER).exists());
+    assert!(wallet_path.join(MAKER1).exists());
+    assert!(wallet_path.join(MAKER2).exists());
 
     // Create 3 taker and maker address and send 0.05 btc to each
     for _ in 0..3 {
@@ -189,16 +196,13 @@ async fn test_standard_coinswap() {
     // Start watchtower, makers and taker to execute a coinswap
     let kill_flag_watchtower = kill_flag.clone();
     let watchtower_thread = thread::spawn(|| {
-        teleport::run_watchtower(
-            &PathBuf::from_str(WATCHTOWER_DATA).unwrap(),
-            Some(kill_flag_watchtower),
-        );
+        teleport::run_watchtower(&WATCHTOWER_DATA.into(), Some(kill_flag_watchtower));
     });
 
     let kill_flag_maker1 = kill_flag.clone();
     let maker1_thread = thread::spawn(|| {
         teleport::run_maker(
-            &PathBuf::from_str(MAKER1).unwrap(),
+            &MAKER1.into(),
             WalletSyncAddressAmount::Testing,
             6102,
             MakerBehavior::Normal,
@@ -209,7 +213,7 @@ async fn test_standard_coinswap() {
     let kill_flag_maker2 = kill_flag.clone();
     let maker2_thread = thread::spawn(|| {
         teleport::run_maker(
-            &PathBuf::from_str(MAKER2).unwrap(),
+            &MAKER2.into(),
             WalletSyncAddressAmount::Testing,
             16102,
             MakerBehavior::Normal,
@@ -221,7 +225,7 @@ async fn test_standard_coinswap() {
         // Wait and then start the taker
         thread::sleep(time::Duration::from_secs(20));
         teleport::run_taker(
-            &PathBuf::from_str(TAKER).unwrap(),
+            &TAKER.into(),
             WalletSyncAddressAmount::Testing,
             1000,
             500000,

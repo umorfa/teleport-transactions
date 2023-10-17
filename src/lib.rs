@@ -1,17 +1,10 @@
-const RPC_CREDENTIALS: Option<(&str, &str)> = Some(("regtestrpcuser", "regtestrpcpass"));
-//None; // use Bitcoin Core cookie-based authentication
-
-const RPC_WALLET: &str = "teleport";
-const RPC_HOSTPORT: &str = "localhost:18443";
-//default ports: mainnet=8332, testnet=18332, regtest=18443, signet=38332
-
 extern crate bitcoin;
 extern crate bitcoin_wallet;
 extern crate bitcoincore_rpc;
 
-use dirs::home_dir;
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::fs;
 use std::io;
 use std::iter::repeat;
 use std::path::PathBuf;
@@ -20,7 +13,7 @@ use std::sync::{Arc, Once, RwLock};
 use bitcoin::hashes::{hash160::Hash as Hash160, hex::ToHex};
 use bitcoin::{Amount, Network};
 use bitcoin_wallet::mnemonic;
-use bitcoincore_rpc::{Auth, Client, Error, RpcApi};
+use bitcoincore_rpc::{Auth, Client, RpcApi};
 
 use chrono::NaiveDateTime;
 
@@ -47,8 +40,16 @@ use offerbook_sync::{get_advertised_maker_addresses, sync_offerbook_with_address
 pub mod fidelity_bonds;
 use fidelity_bonds::{get_locktime_from_index, YearAndMonth};
 
-pub mod directory_servers;
+pub mod settings;
+use settings::Settings;
+
+pub mod utils;
+use utils::teleport_data_dir;
+
 pub mod error;
+use error::Error;
+
+pub mod directory_servers;
 pub mod funding_tx;
 pub mod messages;
 pub mod watchtower_client;
@@ -67,32 +68,35 @@ fn str_to_bitcoin_network(net_str: &str) -> Network {
 }
 
 pub fn get_bitcoin_rpc() -> Result<(Client, Network), Error> {
-    let auth = match RPC_CREDENTIALS {
-        Some((user, pass)) => Auth::UserPass(user.to_string(), pass.to_string()),
-        None => {
-            //TODO this currently only works for Linux and regtest,
-            //     also support other OSes (Windows, MacOS...) and networks
-            let data_dir = home_dir().unwrap().join(".bitcoin");
-            Auth::CookieFile(data_dir.join("regtest").join(".cookie"))
-        }
+    let blockchain_settings = &Settings::global().blockchain;
+    let auth = match blockchain_settings.rpc_userpass() {
+        Some((user, pass)) => Auth::UserPass(user, pass),
+        _ => Auth::CookieFile(blockchain_settings.rpc_cookie_path()),
     };
-    let rpc = Client::new(
-        format!("http://{}/wallet/{}", RPC_HOSTPORT, RPC_WALLET),
-        auth,
-    )?;
+    let rpc = Client::new(blockchain_settings.rpc_url(), auth)?;
     let network = str_to_bitcoin_network(rpc.get_blockchain_info()?.chain.as_str());
     Ok((rpc, network))
 }
 
 /// Setup function that will only run once, even if called multiple times.
-pub fn setup_logger() {
+pub fn setup_teleport() {
     INIT.call_once(|| {
+        // Setup logger
         env_logger::Builder::from_env(
             env_logger::Env::default()
                 .default_filter_or("teleport=info,main=info,wallet=info")
                 .default_write_style_or("always"),
         )
         .init();
+
+        // Setup app data directory
+        let datadir = teleport_data_dir();
+        if !datadir.exists() {
+            fs::create_dir(&datadir).expect("Error making app data dir");
+        }
+        if !datadir.join("wallets").exists() {
+            fs::create_dir(&datadir.join("wallets")).expect("Error making wallet dir");
+        }
     });
 }
 
