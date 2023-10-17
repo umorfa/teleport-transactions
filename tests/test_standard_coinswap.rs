@@ -35,9 +35,9 @@ fn create_wallet_and_import(rpc: &Client, filename: PathBuf) -> Wallet {
     // import intital addresses to core
     wallet
         .import_initial_addresses(
-            &rpc,
+            rpc,
             &wallet
-                .get_hd_wallet_descriptors(&rpc)
+                .get_hd_wallet_descriptors(rpc)
                 .unwrap()
                 .iter()
                 .collect::<Vec<&String>>(),
@@ -187,9 +187,9 @@ async fn test_standard_coinswap() {
         4
     );
 
-    assert_eq!(taker_wallet.lock_all_nonwallet_unspents(&rpc).unwrap(), ());
-    assert_eq!(maker1_wallet.lock_all_nonwallet_unspents(&rpc).unwrap(), ());
-    assert_eq!(maker2_wallet.lock_all_nonwallet_unspents(&rpc).unwrap(), ());
+    assert!(taker_wallet.lock_all_nonwallet_unspents(&rpc).is_ok());
+    assert!(maker1_wallet.lock_all_nonwallet_unspents(&rpc).is_ok());
+    assert!(maker2_wallet.lock_all_nonwallet_unspents(&rpc).is_ok());
 
     let kill_flag = Arc::new(RwLock::new(false));
 
@@ -254,13 +254,13 @@ async fn test_standard_coinswap() {
 
     // Recreate the wallet
     let taker_wallet =
-        Wallet::load_wallet_from_file(&TAKER, Network::Regtest, WalletSyncAddressAmount::Testing)
+        Wallet::load_wallet_from_file(TAKER, Network::Regtest, WalletSyncAddressAmount::Testing)
             .unwrap();
     let maker1_wallet =
-        Wallet::load_wallet_from_file(&MAKER1, Network::Regtest, WalletSyncAddressAmount::Testing)
+        Wallet::load_wallet_from_file(MAKER1, Network::Regtest, WalletSyncAddressAmount::Testing)
             .unwrap();
     let maker2_wallet =
-        Wallet::load_wallet_from_file(&MAKER2, Network::Regtest, WalletSyncAddressAmount::Testing)
+        Wallet::load_wallet_from_file(MAKER2, Network::Regtest, WalletSyncAddressAmount::Testing)
             .unwrap();
 
     // Check assertions

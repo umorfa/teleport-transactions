@@ -321,7 +321,7 @@ async fn send_message(
     first_message: &MakerToTakerMessage,
 ) -> Result<(), Error> {
     let mut message_bytes =
-        serde_json::to_vec(first_message).map_err(|e| std::io::Error::from(e))?;
+        serde_json::to_vec(first_message).map_err(std::io::Error::from)?;
     message_bytes.push(b'\n');
     socket_writer.write_all(&message_bytes).await?;
     Ok(())
@@ -556,7 +556,7 @@ fn handle_proof_of_funding(
     let mut funding_output_indexes = Vec::<u32>::new();
     let mut funding_outputs = Vec::<&TxOut>::new();
     let mut incoming_swapcoin_keys = Vec::<(SecretKey, PublicKey, SecretKey)>::new();
-    if proof.confirmed_funding_txes.len() == 0 {
+    if proof.confirmed_funding_txes.is_empty() {
         return Err(Error::Protocol("zero funding txes provided"));
     }
     for funding_info in &proof.confirmed_funding_txes {
@@ -578,7 +578,7 @@ fn handle_proof_of_funding(
         let verify_result = contracts::verify_proof_of_funding(
             Arc::clone(&rpc),
             &mut wallet.write().unwrap(),
-            &funding_info,
+            funding_info,
             funding_output_index,
             proof.next_locktime,
             MINIMUM_LOCKTIME,
@@ -890,7 +890,7 @@ fn handle_hash_preimage(
     {
         let mut wallet_mref = wallet.write().unwrap();
         for multisig_redeemscript in message.senders_multisig_redeemscripts {
-            let mut incoming_swapcoin = wallet_mref
+            let incoming_swapcoin = wallet_mref
                 .find_incoming_swapcoin_mut(&multisig_redeemscript)
                 .ok_or(Error::Protocol("senders multisig_redeemscript not found"))?;
             if read_hashvalue_from_contract(&incoming_swapcoin.contract_redeemscript)

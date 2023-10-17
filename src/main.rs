@@ -5,7 +5,7 @@ use bitcoin::{Script, Transaction};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
-use teleport;
+
 use teleport::direct_send::{CoinToSpend, Destination, SendAmount};
 use teleport::fidelity_bonds::YearAndMonth;
 use teleport::maker_protocol::MakerBehavior;
@@ -245,7 +245,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .iter()
                 .map(|cth| ContractTransaction {
                     tx: deserialize::<Transaction>(
-                        &Vec::from_hex(&cth).expect("Invalid transaction hex string"),
+                        &Vec::from_hex(cth).expect("Invalid transaction hex string"),
                     )
                     .expect("Unable to deserialize transaction hex"),
                     redeemscript: Script::new(),

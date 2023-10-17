@@ -105,7 +105,7 @@ async fn send_coinswap(
     rpc: &Client,
     wallet: &mut Wallet,
     config: TakerConfig,
-    all_maker_offers_addresses: &Vec<OfferAndAddress>,
+    all_maker_offers_addresses: &[OfferAndAddress],
 ) -> Result<(), Error> {
     let mut preimage = [0u8; PREIMAGE_LEN];
     OsRng.fill_bytes(&mut preimage);
@@ -244,7 +244,7 @@ async fn send_coinswap(
             rpc,
             &config,
             &mut maker_offers_addresses,
-            &this_maker,
+            this_maker,
             previous_maker,
             is_taker_previous_peer,
             is_taker_next_peer,
@@ -313,7 +313,7 @@ async fn send_coinswap(
         if is_taker_next_peer {
             incoming_swapcoins = create_incoming_swapcoins(
                 rpc,
-                &wallet,
+                wallet,
                 &maker_sign_sender_and_receiver_contracts,
                 &funding_txes,
                 &funding_tx_merkleproofs,
@@ -418,7 +418,7 @@ pub async fn send_message(
     message: TakerToMakerMessage,
 ) -> Result<(), Error> {
     log::debug!("==> {:#?}", message);
-    let mut result_bytes = serde_json::to_vec(&message).map_err(|e| std::io::Error::from(e))?;
+    let mut result_bytes = serde_json::to_vec(&message).map_err(std::io::Error::from)?;
     result_bytes.push(b'\n');
     socket_writer.write_all(&result_bytes).await?;
     Ok(())
@@ -620,7 +620,7 @@ async fn request_senders_contract_tx_signatures_attempt_once<S: SwapCoin>(
         .sigs
         .iter()
         .zip(outgoing_swapcoins.iter())
-        .any(|(sig, outgoing_swapcoin)| !outgoing_swapcoin.verify_contract_tx_sender_sig(&sig))
+        .any(|(sig, outgoing_swapcoin)| !outgoing_swapcoin.verify_contract_tx_sender_sig(sig))
     {
         return Err(Error::Protocol("invalid signature from maker"));
     }
@@ -722,7 +722,7 @@ async fn request_receivers_contract_tx_signatures_attempt_once<S: SwapCoin>(
         .sigs
         .iter()
         .zip(incoming_swapcoins.iter())
-        .any(|(sig, swapcoin)| !swapcoin.verify_contract_tx_receiver_sig(&sig))
+        .any(|(sig, swapcoin)| !swapcoin.verify_contract_tx_receiver_sig(sig))
     {
         return Err(Error::Protocol("invalid signature from maker"));
     }
@@ -792,7 +792,7 @@ async fn wait_for_funding_tx_confirmation(
             let merkleproofs = funding_txids
                 .iter()
                 .map(|&txid| {
-                    rpc.get_tx_out_proof(&[txid], Some(&txid_blockhash_map.get(&txid).unwrap()))
+                    rpc.get_tx_out_proof(&[txid], Some(txid_blockhash_map.get(&txid).unwrap()))
                         .map(|gettxoutproof_result| gettxoutproof_result.to_hex())
                 })
                 .collect::<Result<Vec<String>, bitcoincore_rpc::Error>>()?;
@@ -865,7 +865,7 @@ async fn exchange_signatures_and_find_next_maker<'a>(
     this_maker_contract_txes: &[Transaction],
     maker_refund_locktime: u16,
     hashvalue: Hash160,
-    outgoing_swapcoins: &Vec<OutgoingSwapCoin>,
+    outgoing_swapcoins: &[OutgoingSwapCoin],
     watchonly_swapcoins: &mut Vec<Vec<WatchOnlySwapCoin>>,
 ) -> Result<
     (
@@ -960,7 +960,7 @@ async fn exchange_signatures_and_find_next_maker_attempt_once<'a>(
     this_maker_contract_txes: &[Transaction],
     maker_refund_locktime: u16,
     hashvalue: Hash160,
-    outgoing_swapcoins: &Vec<OutgoingSwapCoin>,
+    outgoing_swapcoins: &[OutgoingSwapCoin],
     watchonly_swapcoins: &mut Vec<Vec<WatchOnlySwapCoin>>,
 ) -> Result<
     (
@@ -1098,7 +1098,7 @@ async fn exchange_signatures_and_find_next_maker_attempt_once<'a>(
             &watchonly_swapcoins[watchonly_swapcoins.len() - 2]
         };
         request_receivers_contract_tx_signatures(
-            &previous_maker_addr,
+            previous_maker_addr,
             previous_maker_watchonly_swapcoins,
             &maker_sign_sender_and_receiver_contracts.receivers_contract_txes,
         )
@@ -1220,7 +1220,7 @@ async fn send_proof_of_funding_and_check_reply(
         .iter()
         .zip(this_maker_multisig_redeemscripts.iter())
         .map(|(makers_funding_tx, multisig_redeemscript)| {
-            find_funding_output(&makers_funding_tx, &multisig_redeemscript)
+            find_funding_output(makers_funding_tx, multisig_redeemscript)
                 .ok_or(Error::Protocol(
                     "multisig redeemscript not found in funding tx",
                 ))
@@ -1265,9 +1265,9 @@ async fn send_proof_of_funding_and_check_reply(
         this_maker_contract_redeemscripts.iter()
     ) {
         validate_contract_tx(
-            &receivers_contract_tx,
+            receivers_contract_tx,
             Some(&contract_tx.input[0].previous_output),
-            &contract_redeemscript,
+            contract_redeemscript,
         )?;
     }
     let next_swap_contract_redeemscripts = next_peer_hashlock_pubkeys
@@ -1392,7 +1392,7 @@ fn create_incoming_swapcoins(
         .iter()
         .zip(next_swap_multisig_redeemscripts.iter())
         .map(|(makers_funding_tx, multisig_redeemscript)| {
-            find_funding_output(&makers_funding_tx, &multisig_redeemscript)
+            find_funding_output(makers_funding_tx, multisig_redeemscript)
                 .ok_or(Error::Protocol(
                     "multisig redeemscript not found in funding tx",
                 ))
@@ -1449,9 +1449,9 @@ fn create_incoming_swapcoins(
             o_ms_pubkey1
         };
 
-        wallet.import_wallet_multisig_redeemscript(&rpc, &o_ms_pubkey1, &o_ms_pubkey2)?;
-        wallet.import_tx_with_merkleproof(&rpc, funding_tx, funding_tx_merkleproof.clone())?;
-        wallet.import_wallet_contract_redeemscript(rpc, &next_contract_redeemscript)?;
+        wallet.import_wallet_multisig_redeemscript(rpc, &o_ms_pubkey1, &o_ms_pubkey2)?;
+        wallet.import_tx_with_merkleproof(rpc, funding_tx, funding_tx_merkleproof.clone())?;
+        wallet.import_wallet_contract_redeemscript(rpc, next_contract_redeemscript)?;
 
         let mut incoming_swapcoin = IncomingSwapCoin::new(
             maker_funded_multisig_privkey,
@@ -1476,7 +1476,7 @@ fn get_multisig_redeemscripts_from_swapcoins<S: SwapCoin>(swapcoins: &[S]) -> Ve
 }
 
 fn check_and_apply_maker_private_keys<S: SwapCoin>(
-    swapcoins: &mut Vec<S>,
+    swapcoins: &mut [S],
     swapcoin_private_keys: &[SwapCoinPrivateKey],
 ) -> Result<(), Error> {
     for (swapcoin, swapcoin_private_key) in swapcoins.iter_mut().zip(swapcoin_private_keys.iter()) {
@@ -1490,10 +1490,10 @@ fn check_and_apply_maker_private_keys<S: SwapCoin>(
 async fn settle_all_coinswaps_send_hash_preimage_and_privkeys(
     config: &TakerConfig,
     preimage: Preimage,
-    active_maker_addresses: &Vec<&MakerAddress>,
-    outgoing_swapcoins: &Vec<OutgoingSwapCoin>,
-    watchonly_swapcoins: &mut Vec<Vec<WatchOnlySwapCoin>>,
-    incoming_swapcoins: &mut Vec<IncomingSwapCoin>,
+    active_maker_addresses: &[&MakerAddress],
+    outgoing_swapcoins: &[OutgoingSwapCoin],
+    watchonly_swapcoins: &mut [Vec<WatchOnlySwapCoin>],
+    incoming_swapcoins: &mut [IncomingSwapCoin],
 ) -> Result<(), Error> {
     let mut outgoing_privkeys: Option<Vec<SwapCoinPrivateKey>> = None;
     for (index, maker_address) in active_maker_addresses.iter().enumerate() {
@@ -1501,12 +1501,12 @@ async fn settle_all_coinswaps_send_hash_preimage_and_privkeys(
         let is_taker_next_peer = (index as u16) == config.maker_count - 1;
 
         let senders_multisig_redeemscripts = if is_taker_previous_peer {
-            get_multisig_redeemscripts_from_swapcoins(&outgoing_swapcoins)
+            get_multisig_redeemscripts_from_swapcoins(outgoing_swapcoins)
         } else {
             get_multisig_redeemscripts_from_swapcoins(&watchonly_swapcoins[index - 1])
         };
         let receivers_multisig_redeemscripts = if is_taker_next_peer {
-            get_multisig_redeemscripts_from_swapcoins(&incoming_swapcoins)
+            get_multisig_redeemscripts_from_swapcoins(incoming_swapcoins)
         } else {
             get_multisig_redeemscripts_from_swapcoins(&watchonly_swapcoins[index])
         };
@@ -1575,11 +1575,11 @@ async fn settle_one_coinswap(
     is_taker_previous_peer: bool,
     is_taker_next_peer: bool,
     outgoing_privkeys: &mut Option<Vec<SwapCoinPrivateKey>>,
-    outgoing_swapcoins: &Vec<OutgoingSwapCoin>,
-    watchonly_swapcoins: &mut Vec<Vec<WatchOnlySwapCoin>>,
-    incoming_swapcoins: &mut Vec<IncomingSwapCoin>,
-    senders_multisig_redeemscripts: &Vec<Script>,
-    receivers_multisig_redeemscripts: &Vec<Script>,
+    outgoing_swapcoins: &[OutgoingSwapCoin],
+    watchonly_swapcoins: &mut [Vec<WatchOnlySwapCoin>],
+    incoming_swapcoins: &mut [IncomingSwapCoin],
+    senders_multisig_redeemscripts: &[Script],
+    receivers_multisig_redeemscripts: &[Script],
     preimage: Preimage,
 ) -> Result<(), Error> {
     log::info!("Connecting to {}", maker_address);
@@ -1639,8 +1639,8 @@ async fn settle_one_coinswap(
 async fn send_hash_preimage_and_get_private_keys(
     socket_reader: &mut BufReader<ReadHalf<'_>>,
     socket_writer: &mut WriteHalf<'_>,
-    senders_multisig_redeemscripts: &Vec<Script>,
-    receivers_multisig_redeemscripts: &Vec<Script>,
+    senders_multisig_redeemscripts: &[Script],
+    receivers_multisig_redeemscripts: &[Script],
     preimage: Preimage,
 ) -> Result<PrivateKeyHandover, Error> {
     let receivers_multisig_redeemscripts_len = receivers_multisig_redeemscripts.len();

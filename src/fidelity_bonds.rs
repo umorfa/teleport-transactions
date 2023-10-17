@@ -65,7 +65,7 @@ impl FromStr for YearAndMonth {
         }
         let year = String::from(&s[..4]).parse::<u32>()?;
         let month = String::from(&s[5..]).parse::<u32>()?;
-        if 2020 <= year && year <= 2079 && 1 <= month && month <= 12 {
+        if (2020..=2079).contains(&year) && (1..=12).contains(&month) {
             Ok(YearAndMonth { year, month })
         } else {
             Err(YearAndMonthError::OutOfRange)
@@ -286,15 +286,15 @@ fn create_timelocked_redeemscript(locktime: i64, pubkey: &PublicKey) -> Script {
         .push_int(locktime)
         .push_opcode(opcodes::all::OP_CLTV)
         .push_opcode(opcodes::all::OP_DROP)
-        .push_key(&pubkey)
+        .push_key(pubkey)
         .push_opcode(opcodes::all::OP_CHECKSIG)
         .into_script()
 }
 
 pub fn read_locktime_from_timelocked_redeemscript(redeemscript: &Script) -> Option<i64> {
-    if let Instruction::PushBytes(locktime_bytes) = redeemscript.instructions().nth(0)?.ok()? {
+    if let Instruction::PushBytes(locktime_bytes) = redeemscript.instructions().next()?.ok()? {
         let mut u8slice: [u8; 8] = [0; 8];
-        u8slice[..locktime_bytes.len()].copy_from_slice(&locktime_bytes);
+        u8slice[..locktime_bytes.len()].copy_from_slice(locktime_bytes);
         Some(i64::from_le_bytes(u8slice))
     } else {
         None
@@ -323,8 +323,10 @@ fn get_timelocked_master_key_from_root_master_key(master_key: &ExtendedPrivKey) 
 pub fn get_locktime_from_index(index: u32) -> i64 {
     let year_off = index as i32 / 12;
     let month = index % 12;
-    NaiveDate::from_ymd(2020 + year_off, 1 + month, 1)
-        .and_hms(0, 0, 0)
+    NaiveDate::from_ymd_opt(2020 + year_off, 1 + month, 1)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
         .timestamp()
 }
 
@@ -337,7 +339,7 @@ fn get_timelocked_redeemscript_from_index<C: Context + Signing>(
         .ckd_priv(secp, ChildNumber::Normal { index })
         .unwrap()
         .private_key;
-    let pubkey = privkey.public_key(&secp);
+    let pubkey = privkey.public_key(secp);
     let locktime = get_locktime_from_index(index);
     create_timelocked_redeemscript(locktime, &pubkey)
 }
@@ -387,16 +389,18 @@ impl Wallet {
         &self,
         rpc: &Client,
     ) -> Result<Option<HotWalletFidelityBond>, Error> {
-        let list_unspent_result = self.list_unspent_from_wallet(&rpc, false, true)?;
+        let list_unspent_result = self.list_unspent_from_wallet(rpc, false, true)?;
         let fidelity_bond_utxos = list_unspent_result
             .iter()
             .filter(|(utxo, _)| utxo.confirmations > 0)
-            .filter(|(_, usi)| match usi {
-                UTXOSpendInfo::FidelityBondCoin {
-                    index: _,
-                    input_value: _,
-                } => true,
-                _ => false,
+            .filter(|(_, usi)| {
+                matches!(
+                    usi,
+                    UTXOSpendInfo::FidelityBondCoin {
+                        index: _,
+                        input_value: _,
+                    }
+                )
             })
             .collect::<Vec<&(ListUnspentResultEntry, UTXOSpendInfo)>>();
         let fidelity_bond_values = fidelity_bond_utxos

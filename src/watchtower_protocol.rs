@@ -225,7 +225,7 @@ async fn run(
                 let mut data_file = read_from_data_file(data_file_path)?;
 
                 let contract_check_result = run_contract_checks(
-                    &rpc,
+                    rpc,
                     network,
                     &mut data_file.coinswap_in_progress_contracts,
                     &mut data_file.last_checked_block_height,
@@ -325,7 +325,7 @@ async fn send_message(
     socket_writer: &mut WriteHalf<'_>,
     message: &WatchtowerToMakerMessage,
 ) -> Result<(), Error> {
-    let mut message_bytes = serde_json::to_vec(message).map_err(|e| std::io::Error::from(e))?;
+    let mut message_bytes = serde_json::to_vec(message).map_err(std::io::Error::from)?;
     message_bytes.push(b'\n');
     socket_writer.write_all(&message_bytes).await?;
     Ok(())
@@ -360,7 +360,7 @@ fn read_from_data_file<P: AsRef<Path>>(data_file_path: P) -> Result<WatchtowerDa
     let mut data_file_str = String::new();
     data_file.read_to_string(&mut data_file_str)?;
     Ok(serde_json::from_str::<WatchtowerDataFile>(&data_file_str)
-        .map_err(|e| io::Error::from(e))?)
+        .map_err(io::Error::from)?)
 }
 
 fn write_to_data_file<P: AsRef<Path>>(
@@ -368,7 +368,7 @@ fn write_to_data_file<P: AsRef<Path>>(
     data: WatchtowerDataFile,
 ) -> Result<(), Error> {
     let data_file = File::create(teleport_data_dir().join(data_file_path))?;
-    serde_json::to_writer(data_file, &data).map_err(|e| io::Error::from(e))?;
+    serde_json::to_writer(data_file, &data).map_err(io::Error::from)?;
     Ok(())
 }
 
@@ -384,14 +384,14 @@ fn run_contract_checks(
         "coinswap_in_progress_contracts = {:?}",
         coinswap_in_progress_contracts
             .iter()
-            .map(|c| ContractsInfoDisplay::from(c))
+            .map(ContractsInfoDisplay::from)
             .collect::<Vec<ContractsInfoDisplay>>()
     );
     log::debug!(
         "live_contracts = {:?}",
         live_contracts
             .iter()
-            .map(|c| ContractsInfoDisplay::from(c))
+            .map(ContractsInfoDisplay::from)
             .collect::<Vec<ContractsInfoDisplay>>()
     );
 
@@ -404,10 +404,8 @@ fn run_contract_checks(
         import_broadcasted_contract_redeemscripts(rpc, network, &broadcasted_contracts)?;
         //remove broadcasted_contracts from the vec coinswap_in_progress_contracts
         coinswap_in_progress_contracts.retain(|cipc| {
-            broadcasted_contracts
-                .iter()
-                .find(|&bc| bc == cipc)
-                .is_none()
+            !broadcasted_contracts
+                .iter().any(|bc| bc == cipc)
         });
         live_contracts.extend(broadcasted_contracts);
     }
@@ -419,7 +417,7 @@ fn run_contract_checks(
         closed_contracts.extend(closed_contracts2);
         if !closed_contracts.is_empty() {
             //remove closed_contracts from the vec coinswap_in_progress_contracts
-            live_contracts.retain(|cipc| closed_contracts.iter().find(|&c| c == cipc).is_none());
+            live_contracts.retain(|cipc| !closed_contracts.iter().any(|c| c == cipc));
         }
     }
     Ok(())
@@ -503,10 +501,8 @@ pub fn check_for_broadcasted_contract_txes(
                 .contract_txes
                 .iter()
                 .filter(|ctx| {
-                    contract_txids_on_network
-                        .iter()
-                        .find(|&&&txid| txid == ctx.tx.txid())
-                        .is_none()
+                    !contract_txids_on_network
+                        .iter().any(|&&txid| txid == ctx.tx.txid())
                 })
                 .map(|ctx| &ctx.tx)
                 .collect::<Vec<&Transaction>>();
@@ -580,7 +576,7 @@ fn check_for_hashlock_spends(
     const BATCH_SIZE: usize = 100;
     let mut wallet_transactions = Vec::<ListTransactionResult>::new();
     for batch in 0..1000 {
-        let skip = batch * BATCH_SIZE as usize;
+        let skip = batch * BATCH_SIZE;
         let mut txes = rpc.list_transactions(None, Some(BATCH_SIZE), Some(skip), Some(true))?;
         if txes.is_empty() {
             break;
@@ -686,7 +682,7 @@ fn check_for_hashlock_spends(
                 continue;
             }
             let preimage = &input.witness[1];
-            if Hash160::hash(&preimage) != hashvalue {
+            if Hash160::hash(preimage) != hashvalue {
                 log::debug!(
                     "txid={} not hashlock spend, preimage does not match",
                     wallet_tx.info.txid

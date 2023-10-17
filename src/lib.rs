@@ -95,7 +95,7 @@ pub fn setup_teleport() {
             fs::create_dir(&datadir).expect("Error making app data dir");
         }
         if !datadir.join("wallets").exists() {
-            fs::create_dir(&datadir.join("wallets")).expect("Error making wallet dir");
+            fs::create_dir(datadir.join("wallets")).expect("Error making wallet dir");
         }
     });
 }
@@ -116,11 +116,11 @@ pub fn generate_wallet(wallet_file_name: &PathBuf) -> std::io::Result<()> {
         mnemonic::Mnemonic::new_random(bitcoin_wallet::account::MasterKeyEntropy::Sufficient)
             .unwrap();
 
-    Wallet::save_new_wallet_file(&wallet_file_name, mnemonic.to_string(), extension.clone())
+    Wallet::save_new_wallet_file(wallet_file_name, mnemonic.to_string(), extension.clone())
         .unwrap();
 
     let w = match Wallet::load_wallet_from_file(
-        &wallet_file_name,
+        wallet_file_name,
         network,
         WalletSyncAddressAmount::Normal,
     ) {
@@ -171,7 +171,7 @@ pub fn recover_wallet(wallet_file_name: &PathBuf) -> std::io::Result<()> {
     io::stdin().read_line(&mut extension)?;
     extension = extension.trim().to_string();
 
-    Wallet::save_new_wallet_file(&wallet_file_name, seed_phrase, extension).unwrap();
+    Wallet::save_new_wallet_file(wallet_file_name, seed_phrase, extension).unwrap();
     println!("\nSaved to file `{}`", wallet_file_name.to_string_lossy());
     Ok(())
 }
@@ -202,15 +202,13 @@ pub fn display_wallet_balance(wallet_file_name: &PathBuf, long_form: Option<bool
     let utxos_incl_fbonds = wallet.list_unspent_from_wallet(&rpc, false, true).unwrap();
     let (mut utxos, mut fidelity_bond_utxos): (Vec<_>, Vec<_>) =
         utxos_incl_fbonds.iter().partition(|(_, usi)| {
-            if let UTXOSpendInfo::FidelityBondCoin {
-                index: _,
-                input_value: _,
-            } = usi
-            {
-                false
-            } else {
-                true
-            }
+            matches!(
+                usi,
+                UTXOSpendInfo::FidelityBondCoin {
+                    index: _,
+                    input_value: _,
+                }
+            )
         });
     utxos.sort_by(|(a, _), (b, _)| b.confirmations.cmp(&a.confirmations));
     let utxo_count = utxos.len();
@@ -230,16 +228,14 @@ pub fn display_wallet_balance(wallet_file_name: &PathBuf, long_form: Option<bool
             "{}{}{}:{} {}{}{} {:^8} {:<7} {}",
             if long_form { &txid } else {&txid[0..6] },
             if long_form { "" } else { ".." },
-            if long_form { &"" } else { &txid[58..64] },
+            if long_form { "" } else { &txid[58..64] },
             utxo.vout,
             if long_form { &addr } else { &addr[0..10] },
             if long_form { "" } else { "...." },
-            if long_form { &"" } else { &addr[addr.len() - 10..addr.len()] },
+            if long_form { "" } else { &addr[addr.len() - 10..addr.len()] },
             if utxo.witness_script.is_some() {
                 "swapcoin"
-            } else {
-                if utxo.descriptor.is_some() { "seed" } else { "timelock" }
-            },
+            } else if utxo.descriptor.is_some() { "seed" } else { "timelock" },
             utxo.confirmations,
             utxo.amount
         );
@@ -280,7 +276,7 @@ pub fn display_wallet_balance(wallet_file_name: &PathBuf, long_form: Option<bool
                 println!("{}{}{}:{} {:8} {:8} {:^15} {:<7} {}",
                     if long_form { &txid } else {&txid[0..6] },
                     if long_form { "" } else { ".." },
-                    if long_form { &"" } else { &txid[58..64] },
+                    if long_form { "" } else { &txid[58..64] },
                     utxo.vout,
                     contract_type,
                     if swapcoin.is_hash_preimage_known() { "known" } else { "unknown" },
@@ -323,7 +319,7 @@ pub fn display_wallet_balance(wallet_file_name: &PathBuf, long_form: Option<bool
             println!("{}{}{}:{} {}{} {:<8} {:<7} {:<8} {}",
                 if long_form { &txid } else {&txid[0..6] },
                 if long_form { "" } else { ".." },
-                if long_form { &"" } else { &txid[58..64] },
+                if long_form { "" } else { &txid[58..64] },
                 utxo.vout,
                 if long_form { &hashvalue } else { &hashvalue[..8] },
                 if long_form { "" } else { ".." },
@@ -355,7 +351,7 @@ pub fn display_wallet_balance(wallet_file_name: &PathBuf, long_form: Option<bool
             println!("{}{}{}:{} {}{} {:<8} {:<7} {:8} {}",
                 if long_form { &txid } else {&txid[0..6] },
                 if long_form { "" } else { ".." },
-                if long_form { &"" } else { &txid[58..64] },
+                if long_form { "" } else { &txid[58..64] },
                 utxo.vout,
                 if long_form { &hashvalue } else { &hashvalue[..8] },
                 if long_form { "" } else { ".." },
@@ -367,7 +363,7 @@ pub fn display_wallet_balance(wallet_file_name: &PathBuf, long_form: Option<bool
         }
     }
 
-    if fidelity_bond_utxos.len() > 0 {
+    if !fidelity_bond_utxos.is_empty() {
         println!("= fidelity bond coins =");
         println!(
             "{:16} {:24} {:<7} {:<11} {:<8} {:6}",
@@ -394,13 +390,13 @@ pub fn display_wallet_balance(wallet_file_name: &PathBuf, long_form: Option<bool
                 "{}{}{}:{} {}{}{} {:<7} {:<11} {:<8} {:6}",
                 if long_form { &txid } else {&txid[0..6] },
                 if long_form { "" } else { ".." },
-                if long_form { &"" } else { &txid[58..64] },
+                if long_form { "" } else { &txid[58..64] },
                 utxo.vout,
                 if long_form { &addr } else { &addr[0..10] },
                 if long_form { "" } else { "...." },
-                if long_form { &"" } else { &addr[addr.len() - 10..addr.len()] },
+                if long_form { "" } else { &addr[addr.len() - 10..addr.len()] },
                 utxo.confirmations,
-                NaiveDateTime::from_timestamp(unix_locktime, 0)
+                NaiveDateTime::from_timestamp_opt(unix_locktime, 0).unwrap()
                     .format("%Y-%m-%d")
                     .to_string(),
                 if mediantime >= unix_locktime.try_into().unwrap() { "unlocked" } else { "locked" },
@@ -508,9 +504,9 @@ pub fn print_fidelity_bond_address(wallet_file_name: &PathBuf, locktime: &YearAn
     ));
     println!(
         "Coins sent to this address will not be spendable until {}",
-        NaiveDateTime::from_timestamp(unix_locktime, 0)
+        NaiveDateTime::from_timestamp_opt(unix_locktime, 0)
+            .unwrap()
             .format("%Y-%m-%d")
-            .to_string()
     );
     println!("{}", addr);
 }
@@ -546,11 +542,7 @@ pub fn run_maker(
         watchtower_ping_interval_secs: 300,
         directory_servers_refresh_interval_secs: 60 * 60 * 12, //12 hours
         maker_behavior,
-        kill_flag: if kill_flag.is_none() {
-            Arc::new(RwLock::new(false))
-        } else {
-            kill_flag.unwrap().clone()
-        },
+        kill_flag: kill_flag.unwrap_or(Arc::new(RwLock::new(false))),
         idle_connection_timeout: 300,
     };
     maker_protocol::start_maker(rpc_ptr, wallet_ptr, config);
@@ -808,10 +800,6 @@ pub fn run_watchtower(data_file_path: &PathBuf, kill_flag: Option<Arc<RwLock<boo
         &rpc,
         data_file_path,
         network,
-        if kill_flag.is_none() {
-            Arc::new(RwLock::new(false))
-        } else {
-            kill_flag.unwrap().clone()
-        },
+        kill_flag.unwrap_or(Arc::new(RwLock::new(false))),
     );
 }

@@ -1,6 +1,6 @@
 use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use crate::utils::bitcoin_data_dir;
@@ -56,7 +56,7 @@ impl Settings {
         SETTINGS.get().as_ref().expect("Settings not initialized")
     }
 
-    pub fn init_settings(datadir: &PathBuf) -> &'static Settings {
+    pub fn init_settings(datadir: &Path) -> &'static Settings {
         let config_location = datadir.join("teleport.conf");
 
         let s = Config::builder()

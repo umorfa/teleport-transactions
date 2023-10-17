@@ -83,7 +83,7 @@ pub fn redeemscript_to_scriptpubkey(redeemscript: &Script) -> Script {
     //p2wsh address
     Script::new_witness_program(
         bitcoin::bech32::u5::try_from_u8(0).unwrap(),
-        &redeemscript.wscript_hash().to_vec(),
+        &redeemscript.wscript_hash(),
     )
 }
 
@@ -172,11 +172,11 @@ pub fn create_contract_redeemscript(
         .push_slice(&hashvalue[..])
         .push_opcode(opcodes::all::OP_EQUAL)
         .push_opcode(opcodes::all::OP_IF)
-            .push_key(&pub_hashlock)
+            .push_key(pub_hashlock)
             .push_int(32)
             .push_int(1)
         .push_opcode(opcodes::all::OP_ELSE)
-            .push_key(&pub_timelock)
+            .push_key(pub_timelock)
             .push_int(0)
             .push_int(locktime as i64)
         .push_opcode(opcodes::all::OP_ENDIF)
@@ -265,7 +265,7 @@ pub fn create_senders_contract_tx(
             script_sig: Script::new(),
         }],
         output: vec![TxOut {
-            script_pubkey: redeemscript_to_scriptpubkey(&contract_redeemscript),
+            script_pubkey: redeemscript_to_scriptpubkey(contract_redeemscript),
             value: input_value - 1000,
         }],
         lock_time: 0,
@@ -346,7 +346,7 @@ pub fn validate_and_sign_senders_contract_tx(
     is_contract_out_valid(
         &senders_contract_tx.output[0],
         &hashlock_pubkey_from_nonce,
-        &timelock_pubkey,
+        timelock_pubkey,
         hashvalue,
         locktime,
         minimum_locktime,
@@ -362,20 +362,20 @@ pub fn validate_and_sign_senders_contract_tx(
         .add_assign(multisig_key_nonce.as_ref())
         .map_err(|_| Error::Protocol("error with multisig tweakable privkey + multisig nonce"))?;
 
-    Ok(sign_contract_tx(
-        &senders_contract_tx,
-        &multisig_redeemscript,
+    sign_contract_tx(
+        senders_contract_tx,
+        multisig_redeemscript,
         funding_input_value,
         &multisig_privkey_from_nonce,
     )
-    .map_err(|_| Error::Protocol("error with signing contract tx"))?)
+    .map_err(|_| Error::Protocol("error with signing contract tx"))
 }
 
 pub fn find_funding_output<'a>(
     funding_tx: &'a Transaction,
     multisig_redeemscript: &Script,
 ) -> Option<(u32, &'a TxOut)> {
-    let multisig_spk = redeemscript_to_scriptpubkey(&multisig_redeemscript);
+    let multisig_spk = redeemscript_to_scriptpubkey(multisig_redeemscript);
     funding_tx
         .output
         .iter()
@@ -506,7 +506,7 @@ pub fn validate_contract_tx(
         return Err(Error::Protocol("not spending the funding outpoint"));
     }
     if receivers_contract_tx.output[0].script_pubkey
-        != redeemscript_to_scriptpubkey(&contract_redeemscript)
+        != redeemscript_to_scriptpubkey(contract_redeemscript)
     {
         return Err(Error::Protocol("doesnt pay to requested contract"));
     }
@@ -694,13 +694,13 @@ impl OutgoingSwapCoin {
         contract_tx: &Transaction,
     ) -> Result<Signature, Error> {
         let multisig_redeemscript = self.get_multisig_redeemscript();
-        Ok(sign_contract_tx(
+        sign_contract_tx(
             contract_tx,
             &multisig_redeemscript,
             self.funding_amount,
             &self.my_privkey,
         )
-        .map_err(|_| Error::Protocol("error with signing contract tx"))?)
+        .map_err(|_| Error::Protocol("error with signing contract tx"))
     }
 }
 
@@ -826,7 +826,7 @@ mod test {
         let privkey_org =
             PrivateKey::from_wif("cVt4o7BGAig1UXywgGSmARhxMdzP5qvQsxKkSsc1XEkw3tDTQFpy").unwrap();
         let pubkey_org = privkey_org.public_key(&secp);
-        let (pubkey_derived, nonce) = derive_maker_pubkey_and_nonce(pubkey_org.clone()).unwrap();
+        let (pubkey_derived, nonce) = derive_maker_pubkey_and_nonce(pubkey_org).unwrap();
         let nonce_point = secp256k1::PublicKey::from_secret_key(&secp, &nonce);
         let expected_derivation = PublicKey {
             compressed: true,
@@ -1111,15 +1111,14 @@ mod test {
         )
         .unwrap();
 
-        assert_eq!(
+        assert!(
             verify_contract_tx_sig(
                 &contract_tx,
                 &funding_outpoint_script,
                 funding_tx.output[0].value,
                 &pub1,
                 &sig1
-            ),
-            true
+            )
         );
 
         // priv2 signs the contract and verify
