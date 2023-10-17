@@ -16,8 +16,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use std::{thread, time};
 
-use std::str::FromStr;
-
 static WATCHTOWER_DATA: &str = "watchtower.dat";
 static TAKER: &str = "taker-wallet";
 static MAKER1: &str = "maker-wallet-1";

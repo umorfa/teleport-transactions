@@ -11,7 +11,7 @@ static SETTINGS: OnceLock<Settings> = OnceLock::new();
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Settings {
     pub blockchain: BlockchainSettings,
-    pub unstable: UnstableSettings,
+    pub datadir: Option<PathBuf>,
 }
 
 /// Settings relating to the bitcoin node
@@ -47,11 +47,6 @@ impl BlockchainSettings {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct UnstableSettings {
-    pub datadir: Option<PathBuf>,
-}
-
 impl Settings {
     pub fn global() -> &'static Settings {
         SETTINGS.get().as_ref().expect("Settings not initialized")
@@ -65,7 +60,7 @@ impl Settings {
             .add_source(
                 File::new(config_location.to_str().unwrap(), FileFormat::Toml).required(false),
             )
-            .set_override("unstable.datadir", datadir.to_str())
+            .set_override("datadir", datadir.to_str())
             .unwrap()
             .build()
             .unwrap();
@@ -88,7 +83,7 @@ impl Default for Settings {
                 rpc_cookie_file: None,
                 rpc_wallet_file: "teleport".to_string(),
             },
-            unstable: UnstableSettings { datadir: None },
+            datadir: None,
         }
     }
 }

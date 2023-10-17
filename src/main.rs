@@ -10,6 +10,7 @@ use teleport::direct_send::{CoinToSpend, Destination, SendAmount};
 use teleport::fidelity_bonds::YearAndMonth;
 use teleport::maker_protocol::MakerBehavior;
 use teleport::settings::Settings;
+use teleport::utils::default_data_dir;
 use teleport::wallet_sync::{DisplayAddressType, WalletSyncAddressAmount};
 use teleport::watchtower_protocol::{ContractTransaction, ContractsInfo};
 
@@ -31,7 +32,7 @@ struct ArgsWithWalletFile {
 
     /// Data directory for teleport files
     #[structopt(parse(from_os_str), long)]
-    datadir: PathBuf,
+    datadir: Option<PathBuf>,
 
     /// Subcommand
     #[structopt(flatten)]
@@ -134,7 +135,11 @@ enum Subcommand {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = ArgsWithWalletFile::from_args();
-    Settings::init_settings(&args.datadir);
+    let datadir = match &args.datadir {
+        Some(d) => d.clone(),
+        None => default_data_dir("teleport"),
+    };
+    Settings::init_settings(&datadir);
     teleport::setup_teleport();
 
     match args.subcommand {

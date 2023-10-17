@@ -378,7 +378,7 @@ entity is called the receiver, because they will receive the coins after the coi
 * &#9744; code fidelity bonds
 * &#9744; add support precomputed RBF fee-bumps, so that txes can always be confirmed regardless of the block space market
 * &#9744; automated tests (might be earlier in case its useful in test driven development)
-* &#9744; move wallet files and config to its own data directory ~/.teleport/
+* &#9745; move wallet files and config to its own data directory ~/.teleport/
 * &#9744; add collateral inputs to receiver contract txes
 * &#9744; implement encrypted contract txes for watchtowers, so that watchtowers can do their job without needing to know the addresses involved
 * &#9744; implement branching and merging coinswaps for takers, so that they can create coinswaps even if they just have one UTXO
