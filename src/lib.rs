@@ -69,11 +69,8 @@ fn str_to_bitcoin_network(net_str: &str) -> Network {
 
 pub fn get_bitcoin_rpc() -> Result<(Client, Network), Error> {
     let blockchain_settings = &Settings::global().blockchain;
-    let auth = match (
-        &blockchain_settings.rpc_user,
-        &blockchain_settings.rpc_password,
-    ) {
-        (Some(user), Some(pass)) => Auth::UserPass(user.to_string(), pass.to_string()),
+    let auth = match blockchain_settings.rpc_userpass() {
+        Some((user, pass)) => Auth::UserPass(user, pass),
         _ => Auth::CookieFile(blockchain_settings.rpc_cookie_path()),
     };
     let rpc = Client::new(blockchain_settings.rpc_url(), auth)?;

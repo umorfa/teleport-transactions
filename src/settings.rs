@@ -28,6 +28,14 @@ pub struct BlockchainSettings {
 }
 
 impl BlockchainSettings {
+    /// Return a tuple with the RPC user and password, or None if either is not set
+    pub fn rpc_userpass(&self) -> Option<(String, String)> {
+        match (&self.rpc_user, &self.rpc_password) {
+            (Some(user), Some(pass)) => Some((user.to_string(), pass.to_string())),
+            _ => None,
+        }
+    }
+
     /// Return the file path to the bitcoin RPC cookie file.
     /// Note that this file only exists if bitcoind is actively running
     pub fn rpc_cookie_path(&self) -> PathBuf {

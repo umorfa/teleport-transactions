@@ -63,6 +63,8 @@ async fn test_standard_coinswap() {
     Settings::init_settings(&test_path);
     teleport::setup_teleport();
 
+    // TODO: This only works if the RPC cookie file exists in its default location
+    // Need to figure out a good solution for setting test credentials and other test config
     let (rpc, network) = teleport::get_bitcoin_rpc().unwrap();
     assert_eq!(network, Network::Regtest);
 
