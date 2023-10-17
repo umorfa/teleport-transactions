@@ -13,7 +13,7 @@ use std::sync::{Arc, Once, RwLock};
 use bitcoin::hashes::{hash160::Hash as Hash160, hex::ToHex};
 use bitcoin::{Amount, Network};
 use bitcoin_wallet::mnemonic;
-use bitcoincore_rpc::{Auth, Client, Error, RpcApi};
+use bitcoincore_rpc::{Auth, Client, RpcApi};
 
 use chrono::NaiveDateTime;
 
@@ -46,8 +46,10 @@ use settings::Settings;
 pub mod utils;
 use utils::teleport_data_dir;
 
-pub mod directory_servers;
 pub mod error;
+use error::Error;
+
+pub mod directory_servers;
 pub mod funding_tx;
 pub mod messages;
 pub mod watchtower_client;

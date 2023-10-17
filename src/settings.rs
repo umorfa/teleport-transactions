@@ -23,7 +23,7 @@ pub struct BlockchainSettings {
     pub rpc_port: u16,
     pub rpc_user: Option<String>,
     pub rpc_password: Option<String>,
-    pub rpc_cookie_file: Option<String>,
+    pub rpc_cookie_file: String,
     pub rpc_wallet_file: String,
 }
 
@@ -31,11 +31,7 @@ impl BlockchainSettings {
     /// Return the file path to the bitcoin RPC cookie file.
     /// Note that this file only exists if bitcoind is actively running
     pub fn rpc_cookie_path(&self) -> PathBuf {
-        let cookie_file = match &self.rpc_cookie_file {
-            Some(f) => f.as_str(),
-            None => ".cookie",
-        };
-        bitcoin_data_dir(&self.network).join(cookie_file)
+        bitcoin_data_dir(&self.network).join(&self.rpc_cookie_file)
     }
 
     /// Return the RPC URL
@@ -80,7 +76,7 @@ impl Default for Settings {
                 rpc_port: 18443,
                 rpc_user: None,
                 rpc_password: None,
-                rpc_cookie_file: None,
+                rpc_cookie_file: ".cookie".to_string(),
                 rpc_wallet_file: "teleport".to_string(),
             },
             datadir: None,
